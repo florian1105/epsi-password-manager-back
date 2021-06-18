@@ -51,15 +51,8 @@ app.get('/', function (req, res) {
   res.send('Hello World!')
 });
 
-//all articles
-app.get('/articles', (req, res) => {
-  ax.get('/articles').then(function (response) {
-    // handle success
-    res.json(response.data);
-  });
-});
 
-//all articles for one author
+//all articles for one author -> all mdp for user
 app.get('/articles/:id', (req, res) => {
   const id = req.params.id;
   ax.get(`/articles?q={"auteur.email":"${id}"}`).then(function (response) {
@@ -68,25 +61,8 @@ app.get('/articles/:id', (req, res) => {
   });
 });
 
-app.get('/article/auteur/:id', (req,res) => {
-  const id = req.params.id;
-  ax.get(`/members?q={"email":"${id}"}`,jSonParser).then(function (response) {
-    res.json(response.data)
 
-  })
-});
-
-
-//all commentaires for one article
-app.get('/commentaires/:idArticle', (req, res) => {
-  const id = req.params.id;
-  ax.get(`/commentaires?q={"article":"${id}"}`).then(function (response) {
-    // handle success
-    res.json(response.data);
-  });
-});
-
-//add article
+//add article -> add mdp  
 app.post('/article/add', jSonParser,passport.authenticate('jwt', { session: false }), async(req, res) => {
   const article = req.body;
   console.log(article)
@@ -96,7 +72,7 @@ app.post('/article/add', jSonParser,passport.authenticate('jwt', { session: fals
   });
 });
 
-//modify article
+//modify article -> modify mdp 
 app.post('/article/modify/:id', jSonParser,passport.authenticate('jwt', { session: false }),async(req, res) => {
   const id = req.params.id;
   const article = req.body;
@@ -110,21 +86,15 @@ app.post('/article/modify/:id', jSonParser,passport.authenticate('jwt', { sessio
    await res.json(articleModif.data);
 });
 
-//one article specified by an id
-app.get('/article/:id', async(req, res) => {
-  const id = req.params.id;
-  const article = await ax.get(`/articles?q={"id":${id}}`);
-  await res.json(article.data);
-});
 
-
-//delete one article specified by an id
+//delete one article specified by an id -> delete mdp 
 app.get('/article/delete/:id',passport.authenticate('jwt', { session: false }), async(req, res) => {
   const id = req.params.id;
   const article = await ax.delete(`/articles/*?q={"id":${id}}`);
   await res.json(article.data);
 });
 
+// Login 
 app.post('/login', jSonParser, async (req, res) => {
   const email = req.body.email
   const password = req.body.password
@@ -149,6 +119,7 @@ app.post('/login', jSonParser, async (req, res) => {
   res.json({ jwt: userJwt })
 })
 
+// Create account
 app.post('/register',jSonParser , async (req,res) =>{
   const member = req.body
   bcrypt.hash(member.password, saltRounds, function(err, hash) {
