@@ -1,140 +1,88 @@
 const PORT = process.env.PORT || 5000 // this is very important
-const bodyParser = require('body-parser')
 const express = require('express')
-const jwt = require('jsonwebtoken')
-const passport = require('passport')
-const passportJWT = require('passport-jwt')
-const axios = require('axios')
 const cors = require('cors');
-const secret = 'thisismysecret'
-const jSonParser = bodyParser.json()
+const NodeRSA = require('node-rsa')
+require('dotenv').config()
 const app = express()
-const bcrypt = require('bcrypt')
-const saltRounds = 10;
+app.use(
+  express.urlencoded({
+    extended: true
+  })
+)
+const PRIVATE_KEY=`-----BEGIN PRIVATE KEY-----MIICdQIBADANBgkqhkiG9w0BAQEFAASCAl8wggJbAgEAAoGBALdP0ljDHsKsWiulx2JDVoyW8ykgBKSdVfdeL6QMshYiIlndWPTq/rHrmceGZ6KoBe3C7HHSYUrpgMNIVtg/hot3RFpSH8SoNCUIcUr7t21G+IWxFFwiN9zbF75I02HJgmUqei1+5j+K3Cl735ewGr26WLZ7le935T9zN2PsVN9rAgMBAAECgYAS8z6EjI9GgrjDoFyvTNTKreQvUS8JsXYsn2D/bYyPezHf5mEG2LBBxmBcXwmhqAsM3ETDM4N5UhBMn9LSgiavYXfU0kpMyouq2Xe2wJGpCWtY2Yv972ag8IBaanbdwP7Z1p7HpYsUbIk0NXhcuVKo6HFeUb0OgGOaS/EvUTycaQJBANmLbu9QPnPYiAqbilboJCai0KaTeM6+WEcCJUYSpb5T6cY2hg8hLgZeXm5Fa6LBL4wneNRvlrgOKCjLtYgIHZUCQQDXtz72xqQ2YYfdNFKQAweQi22+Loi8/Vcd9E+2fXeeVckjLGfUoYNX6wEZcgk5sjFMcs75SET4cI086bAJ18j/AkAYiKgPJy6T5ASbpaT5Xh7NmKkNUC5cqozMHUrU1z+H8nC34OhHhodpQnVF3GBiL4VMOhtfYeJOiZIv36FuYPPtAkBNx0aul+TxrqzcN1dlkZISrhM9tW2cJwRYSpTLSeXtcyT4x7QQWMQQ2S0mTZXB9dwMooC6JTKpGXvzcJcGlYVlAkAcYjD4ZmKcSeaIqAbrzGCHXEAhvhze7Xeuk1kguBmDAr28+Crce342wzzgecAI0m05WGEc1zqth4ymHTIMnQlE-----END PRIVATE KEY-----`
+const key = new NodeRSA()
+key.importKey(PRIVATE_KEY, 'pkcs8')
+const { default: axios } = require('axios')
+
+app.use(express.json())
+
 app.use(cors())
+const mysql = require('mysql');
 
-const ExtractJwt = passportJWT.ExtractJwt
-const JwtStrategy = passportJWT.Strategy
+const db = mysql.createConnection({
 
+  host: "localhost",
 
-const ax = axios.create({
-  baseURL:'https://projetnodevue-02a4.restdb.io/rest',
-  headers : {
-    'Content-Type' : 'application/json',
-    'x-apikey' : '160d0237f1c259c83d43af8dd935687f035cb',
-    'cache-control': 'no-cache',
-  }
+  user: "root",
 
-})
+  password: "troisilets",
+  
+  database: "mpp"
+});
 
+db.connect(function(err) {
+  if (err) throw err;
+  console.log("Connecté à la base de données MySQL!");
+});
 
-const jwtOptions = {
-  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: secret
-}
-
-const jwtStrategy = new JwtStrategy(jwtOptions, function(payload, next) {
-  // usually this would be a database call:
-  const user = ax.get(`/members?q={email:${payload.email}`);
-
-  if (user) {
-    next(null, user)
-  } else {
-    next(null, false)
-  }
-})
-
-//passport.use(jwtStrategy)
 
 
 app.get('/', function (req, res) {
   res.send('Hello World!')
 });
 
-
-//all articles for one author -> all mdp for user
-app.get('/articles/:id', (req, res) => {
-  const id = req.params.id;
-  ax.get(`/articles?q={"auteur.email":"${id}"}`).then(function (response) {
-    // handle success
-    res.json(response.data)
-  });
-});
-
-
-//add article -> add mdp  
-app.post('/article/add', jSonParser,passport.authenticate('jwt', { session: false }), async(req, res) => {
-  const article = req.body;
-  console.log(article)
-  ax.post('/articles',article).then(function (response) {
-    // handle success
-    res.json(response.data);
-  });
-});
-
-//modify article -> modify mdp 
-app.post('/article/modify/:id', jSonParser,passport.authenticate('jwt', { session: false }),async(req, res) => {
-  const id = req.params.id;
-  const article = req.body;
-  console.log(article);
-  const articleModif = await ax.put(`/articles/${id}`, {
-    nom: article.nom,
-    contenu: article.contenu,
-    auteur: article.auteur,
-  });
-    // handle success
-   await res.json(articleModif.data);
-});
-
-
-//delete one article specified by an id -> delete mdp 
-app.get('/article/delete/:id',passport.authenticate('jwt', { session: false }), async(req, res) => {
-  const id = req.params.id;
-  const article = await ax.delete(`/articles/*?q={"id":${id}}`);
-  await res.json(article.data);
-});
-
-// Login 
-app.post('/login', jSonParser, async (req, res) => {
+app.post('/login', async (req, res) => {
   const email = req.body.email
   const password = req.body.password
-
+  console.log(req.body)
   if (!email || !password) {
-    res.status(401).json({ error: 'Email or password was not provided.' })
+    res.status(401).json({ error: 'Email ou mot de passe vide.' })
     return
   }
 
-  // usually this would be a database call:
-  var user = await ax.get(`/members?q={"email":"${email}"}`);
-  user=user.data[0]
-  if (bcrypt.compare(password, user.password, function(err, result) {
-    return result
-  })){
-    res.status(401).json({ error: 'Email / password do not match.' })
-    return
-  }
+  db.query("SELECT * FROM users where email = ?", [email], function (err, result) {
+    if (err) throw err;
+    if(compare(result.passord,passord)) {
+      console.log("connexion accpeted")
+    }
 
-  const userJwt = jwt.sign({ user: user.email }, secret)
-
-  res.json({ jwt: userJwt })
-})
-
-// Create account
-app.post('/register',jSonParser , async (req,res) =>{
-  const member = req.body
-  bcrypt.hash(member.password, saltRounds, function(err, hash) {
-    const encMember = {
-      'username':member.username,
-      'email':member.email,
-      'password':hash
-    };
-    ax.post('/members',encMember).then(function (response) {
-      // handle success
-      res.json(response.data);
-    });
   });
-
 });
+  
+
+
+  //if (bcrypt.compare(password, user.password, function(err, result) {
+  //  return result
+  //})){
+  //  res.status(401).json({ error: 'Email / password do not match.' })
+  //  return
+  //}
+//
+  //const userJwt = jwt.sign({ user: user.email }, secret)
+//
+  //res.json({ jwt: userJwt })
+
+//});
+
+app.get('/mdps', function (req, res) {
+  res.send('Hello World!')
+});
+
+function compare(bddMdpEncr, mdpEncr) {
+  let decryptedbdd = key.decrypt(bddMdpEncr, 'utf8')
+  let decrypted = key.decrypt(mdpEncr, 'utf8')
+  return decrypted == decryptedbdd
+}
 
 
 app.listen(PORT, function () {
